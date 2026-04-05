@@ -36,14 +36,38 @@ def detect_mood(user_input, current_mood):
 def detect_service_type(user_input):
     lowered = user_input.lower()
 
-    if any(word in lowered for word in ["plumbing", "leak", "water", "drain", "pipe", "sink", "toilet", "faucet", "clog", "shower",]):
-        return "Plumbing"
-    elif any(word in lowered for word in ["furnace", "heat", "hvac", "boiler", "ac", "air conditioner", "thermostat"]):
-        return "HVAC"
-    elif any(word in lowered for word in ["electrical", "power", "outlet", "breaker", "panel", "wiring"]):
-        return "Electrical"
+    plumbing_words = [
+        "plumbing", "leak", "water", "drain", "pipe",
+        "sink", "toilet", "faucet", "clog", "shower"
+    ]
 
-    return None
+    hvac_words = [
+        "furnace", "heat", "hvac", "boiler",
+        "ac", "air conditioner", "thermostat"
+    ]
+
+    electrical_words = [
+        "electrical", "power", "outlet",
+        "breaker", "panel", "wiring"
+    ]
+
+    plumbing_score = sum(word in lowered for word in plumbing_words)
+    hvac_score = sum(word in lowered for word in hvac_words)
+    electrical_score = sum(word in lowered for word in electrical_words)
+
+    scores = {
+        "Plumbing": plumbing_score,
+        "HVAC": hvac_score,
+        "Electrical": electrical_score
+    }
+
+    best_match = max(scores, key=scores.get)
+    confidence = scores[best_match]
+
+    if confidence == 0:
+        return None, 0
+
+    return best_match, confidence
 
 
 def detect_day(user_input):
@@ -123,20 +147,16 @@ def handle_message(user_input, call_data, stats):
             call_data["state"] = "identify_service"
 
     elif state == "identify_service":
-        service_type = detect_service_type(user_input)
+        service_type, confidence = detect_service_type(user_input)
 
         if service_type:
             call_data["service_type"] = service_type
             call_data["context"]["service_type"] = service_type
-            if "plumbing" in user_input or "leak" in user_input:
-                call_data["context"]["service_type"] = "Plumbing"
 
-            if service_type == "Plumbing":
-                response = "Got it — this sounds like a plumbing issue. Can you tell me what’s going on?"
-            elif service_type == "HVAC":
-                response = "Got it — this sounds like a heating or cooling issue. Can you tell me what’s happening?"
+            if confidence == 1:
+                response = f"I believe this may be a {service_type.lower()} issue — can you tell me a little more about what’s going on?"
             else:
-                response = "Okay — this sounds like an electrical issue. Can you tell me more about it?"
+                response = f"This sounds like a {service_type.lower()} issue. Can you tell me more about the problem?"
 
             print_and_log(call_data, response)
             call_data["state"] = "diagnose_problem"
