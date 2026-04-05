@@ -27,7 +27,8 @@ def log_message(conversation_log, speaker, message):
 
 def detect_mood(user_input, current_mood):
     lowered = user_input.lower()
-    if any(word in lowered for word in ["angry", "mad", "frustrated", "ridiculous", "upset"]):
+    if any(word in lowered for word in ["angry", "mad", "frustrated", "ridiculous", "upset", "pissed", "furious", "damn",
+                                        "horrible", "terrible", "awful", "worst", "unacceptable"]):
         return "angry"
     return current_mood
 
@@ -94,22 +95,6 @@ def save_conversation(call_data):
         file.write("=" * 60 + "\n")
 
 
-def create_new_call(call_id):
-    return {
-        "call_id": call_id,
-        "state": "start",
-        "customer_mood": "neutral",
-        "customer_name": "",
-        "service_type": "",
-        "issue_description": "",
-        "appointment_day": "",
-        "appointment_timeframe": "",
-        "conversation_log": [],
-        "appointment_booked": False,
-        "learned_responses": load_learned_responses()
-    }
-
-
 def print_and_log(call_data, message):
     print("AI:", message)
     log_message(call_data["conversation_log"], "AI", message)
@@ -118,7 +103,6 @@ def print_and_log(call_data, message):
 # -------------------------------
 # Main chatbot logic
 # -------------------------------
-
 def handle_message(user_input, call_data, stats):
     call_data["customer_mood"] = detect_mood(user_input, call_data["customer_mood"])
     state = call_data["state"]
@@ -143,6 +127,9 @@ def handle_message(user_input, call_data, stats):
 
         if service_type:
             call_data["service_type"] = service_type
+            call_data["context"]["service_type"] = service_type
+            if "plumbing" in user_input or "leak" in user_input:
+                call_data["context"]["service_type"] = "Plumbing"
 
             if service_type == "Plumbing":
                 response = "Got it — this sounds like a plumbing issue. Can you tell me what’s going on?"
@@ -158,7 +145,15 @@ def handle_message(user_input, call_data, stats):
             print_and_log(call_data, response)
 
     elif state == "diagnose_problem":
+        lowered = user_input.lower()
+
+        if any(word in lowered for word in ["price", "cost", "how much", "quote"]):
+            response = "I can help with that. Pricing depends on the exact issue, but we can schedule a visit so the technician can give you options and explain the next steps. Can you tell me what problem you're having with the system?"
+            print_and_log(call_data, response)
+            return call_data, stats
+        
         call_data["issue_description"] = user_input.strip()
+        call_data["context"]["issue"] = user_input.strip()
 
         if call_data["customer_mood"] == "angry":
             empathy_response = random_response([
@@ -187,34 +182,82 @@ def handle_message(user_input, call_data, stats):
         if any(word in lowered for word in ["price", "cost", "expensive"]):
             response = "I understand. We can schedule a visit so the technician can give you options and explain the next steps."
             print_and_log(call_data, response)
+            return call_data, stats
 
-        # then handle yes
-        elif "yes" in lowered:
+        # yes + asap -> Today, Earliest
+        if "yes" in lowered and any(word in lowered for word in ["asap", "soon", "today", "earliest"]):
+            call_data["appointment_day"] = "Today"
+            call_data["appointment_timeframe"] = "Earliest Available"
+
+            if not call_data["appointment_booked"]:
+                stats["booked_calls"] += 1
+                call_data["appointment_booked"] = True
+
+            response = (
+                f"Perfect, {call_data['customer_name']}. I’ll mark this for today at the earliest available opening."
+            )
+            print_and_log(call_data, response)
+
+            response = "If anything changes, let us know. Is there anything else I can help with?"
+            print_and_log(call_data, response)
+
+            call_data["state"] = "complete"
+            return call_data, stats
+
+        # then handle yes (without asap)
+        if "yes" in lowered:
             response = "Perfect. What day would you like to schedule for?"
             print_and_log(call_data, response)
             call_data["state"] = "get_day"
+            return call_data, stats
 
         # if customer skips ahead and gives a day directly
-        elif detected_day:
+        if detected_day:
             call_data["appointment_day"] = detected_day
             response = f"Great, I see you mentioned {detected_day}. Would you prefer a morning or afternoon appointment?"
             print_and_log(call_data, response)
             call_data["state"] = "get_timeframe"
+            return call_data, stats
 
-        elif "no" in lowered:
+        if "no" in lowered:
             response = random_response([
                 "No problem. Is there anything you’re unsure about?",
                 "That’s okay. What’s holding you back?",
                 "Totally fine. Is it the timing, the price, or something else?"
             ])
             print_and_log(call_data, response)
+            return call_data, stats
 
-        else:
-            response = "Just let me know if you’d like to get it scheduled."
-            print_and_log(call_data, response)
+        response = "Just let me know if you’d like to get it scheduled."
+        print_and_log(call_data, response)
 
     elif state == "get_day":
-        call_data["appointment_day"] = user_input.strip().title()
+        detected_day = detect_day(user_input)
+        lowered = user_input.lower()
+
+        if detected_day:
+            call_data["appointment_day"] = detected_day
+        else:
+            call_data["appointment_day"] = user_input.strip().title()
+
+        if any(word in lowered for word in ["asap", "soon", "earliest"]):
+            call_data["appointment_timeframe"] = "Earliest Available"
+            if not call_data["appointment_booked"]:
+                stats["booked_calls"] += 1
+                call_data["appointment_booked"] = True
+
+            response = (
+                f"Perfect, {call_data['customer_name']}. I’ve got you scheduled for "
+                f"{call_data['appointment_day']} at the earliest available time."
+            )
+            print_and_log(call_data, response)
+
+            response = "If anything changes, let us know. Is there anything else I can help with?"
+            print_and_log(call_data, response)
+
+            call_data["state"] = "complete"
+            return call_data, stats
+
         response = f"Got it — {call_data['appointment_day']}. Would you prefer a morning or afternoon appointment?"
         print_and_log(call_data, response)
         call_data["state"] = "get_timeframe"
@@ -258,10 +301,20 @@ def handle_message(user_input, call_data, stats):
     elif state == "complete":
         lowered = user_input.lower()
 
+        if "what is this for" in lowered or "what issue" in lowered:
+            response = (
+                f"This appointment is for your "
+                f"{call_data['context']['service_type'].lower()} issue: "
+                f"{call_data['context']['issue']}."
+            )
+            print_and_log(call_data, response)
+            return call_data, stats
+
         if any(word in lowered for word in ["price", "cost", "pricing", "how much"]):
             response = "Pricing depends on the exact issue, but the technician will walk you through options before any work is done. Is there anything else you'd like the technician to take a look at?"
 
-        elif any(word in lowered for word in ["also", "another", "additional", "water heater", "second issue"]):
+        elif any(word in lowered for word in ["also", "another", "additional", "water heater", "second issue", "furnace",
+                                              "hvac", "boiler", "ac", "air conditioner", "thermostat", "electrical", "power", "outlet", "breaker", "panel", "wiring"]):
             response = "Absolutely — we can take a look at that during the same visit. I’ll make a note for the technician."
             call_data["issue_description"] += f" | Additional issue mentioned: {user_input}"
 
@@ -332,6 +385,25 @@ stats = {
 }
 
 call_id = 1
+def create_new_call(call_id):
+    return {
+        "call_id": call_id,
+        "state": "start",
+        "customer_mood": "neutral",
+        "customer_name": "",
+        "appointment_day": "",
+        "appointment_timeframe": "",
+        "service_type": "",
+        "issue_description": "",
+        "conversation_log": [],
+        "appointment_booked": False,
+        "learned_responses": load_learned_responses(),
+        "context": {
+            "service_type": None,
+            "issue": None
+        }
+    }
+
 call_data = create_new_call(call_id)
 
 while True:
