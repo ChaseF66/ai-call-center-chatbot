@@ -1,20 +1,62 @@
 # AI Call Center Chatbot
 
-This project simulates an AI-powered customer service chatbot for a home services call center.
+Python chatbot that simulates a customer service AI assistant for booking home service appointments (plumbing, HVAC, electrical).
 
-The chatbot:
-- Responds to common customer questions
-- Simulates booking service appointments
-- Tracks total calls and booked calls
-- Calculates conversion rate
-- Logs call transcripts for review
-- Saves learned responses using JSON
+This project demonstrates foundational conversational AI design concepts such as state tracking, intent detection, context memory, and incremental learning.
 
-Purpose:
-This project helps demonstrate how AI can assist with customer interactions and how performance metrics can be tracked and improved over time.
+---
 
-Future Improvements:
-- Improve conversation realism
-- Expand service categories
-- Add better natural language understanding
-- Connect to a simple API
+## Features
+
+- Conversational state machine
+- Service type detection (Plumbing, HVAC, Electrical)
+- Customer mood detection
+- Appointment scheduling logic
+- Context memory (remembers issue + service)
+- Handles pricing objections
+- Allows additional issues mid-conversation
+- Persistent learning using JSON
+- Conversation logging for performance tracking
+- Tracks booking conversion rate
+
+---
+
+## Example Flow
+
+start → get_name → identify_service → diagnose_problem → booking → confirmation
+
+---
+
+## Tech Stack
+
+Python  
+JSON  
+CLI (Command Line Interface)
+
+---
+
+## Project Purpose
+
+Built as part of a self-directed AI engineering learning path focused on:
+
+- conversational UX design
+- AI behavior improvement
+- intent classification logic
+- structured conversation flows
+- iterative development
+
+---
+
+## Future Improvements
+
+- confidence scoring for intent detection
+- web interface
+- multiple issue handling improvements
+- analytics dashboard
+- LLM-powered response mode
+
+---
+
+## Author
+
+Chase Fingulin
