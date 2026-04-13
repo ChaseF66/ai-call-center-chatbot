@@ -3,6 +3,12 @@
 Python chatbot that simulates a customer service AI assistant for booking home service appointments (plumbing, HVAC, electrical).
 
 This project demonstrates foundational conversational AI design concepts such as state tracking, intent detection, context memory, and incremental learning.
+Version 1 complete:
+- Added intent priority system
+- Improved issue persistence logic
+- Multi-intent acknowledgement
+- Improved booking flow stability
+- Cleaner conversation confirmation output
 
 ---
 
